@@ -1,0 +1,132 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - DEBUG=1
+    volumes:
+      - "./localstack/data:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    networks:
+      - local_network
+    profiles:
+      - infra
+
+  terraform:
+    image: hashicorp/terraform:latest
+    container_name: terraform
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - "./terraform:/terraform"
+    working_dir: /terraform
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["terraform init && terraform validate && terraform apply -auto-approve"]
+    networks:
+      - local_network
+    profiles:
+      - infra
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    # command: [
+    #   "redis-server",
+    #   "--requirepass", "myredispassword"
+    # ]
+    command: [
+      "redis-server",
+      "--requirepass", "myredispassword",
+      "--appendonly", "yes",
+      "--appendfilename", "appendonly.aof",
+      "--appendfsync", "everysec",
+      "--dir", "/data"
+    ]
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./redis/data:/data"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "myredispassword", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local_network
+    profiles:
+      - infra
+
+  redis_insight:
+    image: redis/redisinsight:latest
+    container_name: redis_insight
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://redis_insight:5540/api/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - "./redis-insight/data:/data"
+    networks:
+      - local_network
+    profiles:
+      - infra
+
+  # setup_redis_insight:
+  #   image: curlimages/curl:latest
+  #   container_name: setup_redis_insight
+  #   depends_on:
+  #     redis_insight:
+  #       condition: service_healthy
+  #   networks:
+  #     - local_network
+  #   entrypoint: ["/bin/sh", "-c"]
+  #   command: >
+  #     echo "Waiting for RedisInsight to be ready..."
+  #     echo "Applying RedisInsight settings..."
+  #     curl -XPATCH 'http://redis_insight:5540/api/settings' \
+  #       -H 'Content-Type: application/json' \
+  #       --data-raw '{"agreements":{"eula":true,"analytics":true,"notifications":true,"encryption":false}}'
+  #     curl 'http://redis_insight:5540/api/databases' \
+  #       -H 'Content-Type: application/json' \
+  #       --data-raw '{"name":"local","host":"redis","port":6379,"password":"myredispassword"}'
+  #     echo "RedisInsight setup completed successfully."
+    # profiles:
+    #   - infra
+
+  worker:
+    build:
+      context: ../app
+      dockerfile: workers/Dockerfile
+    container_name: worker
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+    #   localstack:
+    #     condition: service_healthy
+    env_file:
+      - ../app/.env.docker
+    networks:
+      - local_network
+    profiles:
+      - celery
+    # cpus: 2.0     # Allocate 2 virtual CPUs
+    # mem_limit: 4g # Allocate 4 Gigabytes of memory
+
+networks:
+  local_network:
+    driver: bridge

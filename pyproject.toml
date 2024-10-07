@@ -1,0 +1,52 @@
+[tool.poetry]
+name = "y"
+version = "0.1.0"
+description = ""
+authors = ["Helton Carlos de Souza <heltoncarlossouza@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+celery = {version = "5.5.0b4", extras = ["redis", "dynamodb"]}
+pydantic = "^2.9.2"
+ulid = "^1.1"
+
+
+[tool.poetry.group.dev.dependencies]
+taskipy = "^1.13.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.taskipy.tasks]
+docker_infra = """
+  cd local && \
+  docker compose down -v --remove-orphans && \
+  docker compose --profile infra up --build
+"""
+docker_celery = """
+  cd local && \
+  docker compose down -v --remove-orphans && \
+  docker compose --profile celery up --build
+"""
+terraform = """
+  cd local && \
+  docker compose run --rm -it terraform "terraform apply -auto-approve"
+"""
+requirements = """
+  cd app/workers && \
+  poetry export --without-hashes --format=requirements.txt > requirements.txt
+"""
+worker = """
+  cd app
+  export $(grep -v '^#' $(pwd)/.env | grep -v '^$' | xargs)
+  celery --app=workers.tasks.app worker --pool=prefork --loglevel=INFO
+"""
+client = """
+  cd app
+  export $(grep -v '^#' $(pwd)/.env | grep -v '^$' | xargs)
+  python -m client.client
+"""
