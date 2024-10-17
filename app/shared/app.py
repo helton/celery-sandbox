@@ -38,4 +38,8 @@ app = Celery(
     task_reject_on_worker_lost=True,
     task_create_missing_queues=True,
     enable_utc=True,
+    worker_hijack_root_logger=False,
+    worker_log_format='[%(asctime)s: %(levelname)s/%(processName)s] %(message)s',
+    worker_task_log_format='[%(asctime)s: %(levelname)s/%(processName)s] %(message)s',
+    loglevel='DEBUG',
 )
