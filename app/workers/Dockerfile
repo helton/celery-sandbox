@@ -8,12 +8,13 @@ RUN adduser --disabled-password --gecos '' celery
 WORKDIR /app
 
 COPY --chown=celery:celery workers/requirements.txt .
-COPY --chown=celery:celery workers/*.py .
-COPY --chown=celery:celery shared/ shared/
 
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY --chown=celery:celery workers/*.py .
+COPY --chown=celery:celery shared/ shared/
+
 USER celery
 
-CMD ["celery", "--app", "tasks.app", "worker", "--concurrency=3", "--loglevel=info"]
+CMD ["celery", "--app", "tasks.app", "worker", "--concurrency=10", "--pool=threads", "--loglevel=info"]

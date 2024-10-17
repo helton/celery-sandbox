@@ -11,6 +11,7 @@ python = "^3.12"
 celery = {version = "5.5.0b4", extras = ["redis", "dynamodb"]}
 pydantic = "^2.9.2"
 ulid = "^1.1"
+flower = "^2.0.1"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -30,7 +31,7 @@ docker_infra = """
 docker_celery = """
   cd local && \
   docker compose down -v --remove-orphans && \
-  docker compose --profile celery up --build
+  docker compose --profile celery up --build --scale worker=2
 """
 terraform = """
   cd local && \
@@ -48,5 +49,37 @@ worker = """
 client = """
   cd app
   export $(grep -v '^#' $(pwd)/.env | grep -v '^$' | xargs)
-  python -m client.client
+
+  executions=10
+  printf "Running $executions workflows..."
+
+  start_time=$(date +%s.%N)
+  TMP_DIR=$(mktemp -d)
+
+  run_execution() {
+      local exec_num=$1
+      local output_file="$TMP_DIR/output_$exec_num.txt"
+      {
+          echo "Execution $exec_num"
+          printf '========================================\n'
+          python -m client.client
+      } > "$output_file" 2>&1
+  }
+
+  for ((i=1; i<=executions; i++)); do
+      run_execution "$i" &
+  done
+
+  wait
+
+  for ((i=1; i<=executions; i++)); do
+      cat "$TMP_DIR/output_$i.txt"
+      echo
+  done
+
+  rm -r "$TMP_DIR"
+
+  end_time=$(date +%s.%N)
+  elapsed=$(awk -v start="$start_time" -v end="$end_time" 'BEGIN { printf "%.2f", end - start }')
+  echo "${executions} workflows run in ${elapsed} seconds"
 """
