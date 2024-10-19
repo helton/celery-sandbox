@@ -36,10 +36,6 @@ services:
 
   redis:
     image: redis:latest
-    # command: [
-    #   "redis-server",
-    #   "--requirepass", "myredispassword"
-    # ]
     command: [
       "redis-server",
       "--requirepass", "myredispassword",
@@ -62,64 +58,59 @@ services:
     profiles:
       - infra
 
-  redis_insight:
-    image: redis/redisinsight:latest
-    ports:
-      - "5540:5540"
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://redis_insight:5540/api/health"]
-      interval: 5s
-      timeout: 2s
-      retries: 10
-      start_period: 5s
-    volumes:
-      - "./redis-insight/data:/data"
-    networks:
-      - local_network
-    profiles:
-      - infra
+  # redis_insight:
+  #   image: redis/redisinsight:latest
+  #   ports:
+  #     - "5540:5540"
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "wget -qO- http://redis_insight:5540/api/health"]
+  #     interval: 5s
+  #     timeout: 2s
+  #     retries: 10
+  #     start_period: 5s
+  #   volumes:
+  #     - "./redis-insight/data:/data"
+  #   networks:
+  #     - local_network
+  #   profiles:
+  #     - infra
 
-  setup_redis_insight:
-    image: curlimages/curl:latest
-    depends_on:
-      redis_insight:
-        condition: service_healthy
-    networks:
-      - local_network
-    entrypoint: >
-      sh -c "
-        echo 'Applying RedisInsight settings...'
-        curl -XPATCH 'http://redis_insight:5540/api/settings'  -H 'Content-Type: application/json' --data-raw '{\"agreements\":{\"eula\":true,\"analytics\":true,\"notifications\":true,\"encryption\":false}}'
-        if ! curl -s 'http://redis_insight:5540/api/databases' | grep -q '\"name\":\"local-redis\"'; then
-          curl -XPOST  'http://redis_insight:5540/api/databases' -H 'Content-Type: application/json' --data-raw '{\"name\":\"local-redis\",\"host\":\"redis\",\"port\":6379,\"password\":\"myredispassword\"}'
-        else
-          echo 'Database already exists'
-        fi
-        echo 'RedisInsight setup completed successfully.'
-      "
-    profiles:
-      - infra
+  # setup_redis_insight:
+  #   image: curlimages/curl:latest
+  #   depends_on:
+  #     redis_insight:
+  #       condition: service_healthy
+  #   networks:
+  #     - local_network
+  #   entrypoint: >
+  #     sh -c "
+  #       echo 'Applying RedisInsight settings...'
+  #       curl -XPATCH 'http://redis_insight:5540/api/settings'  -H 'Content-Type: application/json' --data-raw '{\"agreements\":{\"eula\":true,\"analytics\":true,\"notifications\":true,\"encryption\":false}}'
+  #       if ! curl -s 'http://redis_insight:5540/api/databases' | grep -q '\"name\":\"local-redis\"'; then
+  #         curl -XPOST  'http://redis_insight:5540/api/databases' -H 'Content-Type: application/json' --data-raw '{\"name\":\"local-redis\",\"host\":\"redis\",\"port\":6379,\"password\":\"myredispassword\"}'
+  #       else
+  #         echo 'Database already exists'
+  #       fi
+  #       echo 'RedisInsight setup completed successfully.'
+  #     "
+  #   profiles:
+  #     - infra
 
   worker:
     build:
       context: ../app
       dockerfile: workers/Dockerfile
-    # depends_on:
-    #   redis:
-    #     condition: service_healthy
-    #   localstack:
-    #     condition: service_healthy
     env_file:
       - ../app/.env.docker
     networks:
       - local_network
     profiles:
       - celery
-    # cpus: 2.0     # Allocate 2 virtual CPUs
-    # mem_limit: 4g # Allocate 4 Gigabytes of memory
+    cpus: 2.0     # Allocate 3 virtual CPUs
+    mem_limit: 4g # Allocate 4 Gigabytes of memory
 
   flower:
     build:

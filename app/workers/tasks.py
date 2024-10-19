@@ -1,6 +1,6 @@
 import celery
 
-from celery import chain, group, subtask
+from celery import chain, chord, group, subtask
 from celery.utils.log import get_task_logger
 from typing import List
 
@@ -28,9 +28,11 @@ def sum_numbers(numbers: List[int]) -> int:
     logger.info(f"Summing numbers: {numbers}")
     return sum(numbers)
 
+# # reference: https://blog.det.life/replacing-celery-tasks-inside-a-chain-b1328923fb02
 @app.task(name="process_numbers_individually", bind=True)
 def process_numbers_individually(self, numbers: List[int], task_chain):
     logger.info(f"Processing all numbers: {numbers}")
+    logger.info(f"Old task ID: {self.request.id}")
     
     branches = []
     s = subtask(task_chain)

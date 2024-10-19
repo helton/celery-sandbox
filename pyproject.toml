@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-celery = {version = "5.5.0b4", extras = ["redis", "dynamodb"]}
+celery = {version = "5.5.0rc1", extras = ["dynamodb", "redis"]}
 pydantic = "^2.9.2"
 ulid = "^1.1"
 flower = "^2.0.1"
@@ -26,12 +26,32 @@ build-backend = "poetry.core.masonry.api"
 docker_infra = """
   cd local && \
   docker compose down -v --remove-orphans && \
-  docker compose --profile infra up --build
+  docker compose --profile infra up --build -d
 """
 docker_celery = """
   cd local && \
   docker compose down -v --remove-orphans && \
-  docker compose --profile celery up --build --scale worker=2
+  docker compose --profile celery up --build --scale worker=2 -d
+"""
+docker_all = """
+  cd local && \
+  docker compose down -v --remove-orphans && \
+  docker compose --profile infra --profile celery up --build --scale worker=2 -d
+"""
+docker_down="""
+  cd local
+  docker compose --profile infra --profile celery down -v --remove-orphans
+  cd ..
+
+  rm -rf local/localstack/data
+  rm -rf local/redis/data
+  rm -rf local/redis-insight/data
+  rm -rf local/terraform/.terraform local/terraform/.terraform.lock.hcl local/terraform/terraform.tfstate local/terraform/terraform.tfstate.backup
+  
+  mkdir -p local/localstack/data
+  mkdir -p local/redis/data
+  mkdir -p local/redis-insight/data
+  mkdir -p local/terraform/.terraform
 """
 terraform = """
   cd local && \
@@ -50,8 +70,8 @@ client = """
   cd app
   export $(grep -v '^#' $(pwd)/.env | grep -v '^$' | xargs)
 
-  executions=500
-  printf "Running $executions workflows..."
+  executions=150
+  printf "Running $executions workflows...\n\n"
 
   start_time=$(date +%s.%N)
   TMP_DIR=$(mktemp -d)
@@ -82,4 +102,10 @@ client = """
   end_time=$(date +%s.%N)
   elapsed=$(awk -v start="$start_time" -v end="$end_time" 'BEGIN { printf "%.2f", end - start }')
   echo "${executions} workflows run in ${elapsed} seconds"
+"""
+go="""
+  task docker_down
+  task docker_all
+  sleep 30
+  task client | tee output.txt
 """

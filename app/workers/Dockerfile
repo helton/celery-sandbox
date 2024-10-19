@@ -17,4 +17,4 @@ COPY --chown=celery:celery shared/ shared/
 
 USER celery
 
-CMD ["celery", "--app", "tasks.app", "worker", "--concurrency=10", "--pool=threads", "--loglevel=info"]
+CMD ["celery", "--app", "tasks.app", "worker", "--concurrency=10", "--pool=prefork", "--loglevel=info"]
