@@ -47,11 +47,11 @@ def run_workflow(title: str, workflow, timeout: int = 300):
 
 
 if __name__ == "__main__":
-  size = random.randint(1, 10)
-  run_workflow(
-    title="Static Workflow",
-    workflow=group([app.signature("double_number", args=(n,)) | app.signature("square_number") for n in range(1, size)]) | app.signature("sum_numbers")
-  )
+  # size = random.randint(1, 10)
+  # run_workflow(
+  #   title="Static Workflow",
+  #   workflow=group([app.signature("double_number", args=(n,)) | app.signature("square_number") for n in range(1, size)]) | app.signature("sum_numbers")
+  # )
 
   # run_workflow(
   #   title="Dynamic Workflow",
@@ -60,3 +60,11 @@ if __name__ == "__main__":
   #     | app.signature("process_numbers_individually", args=(app.signature("double_number") | app.signature("square_number"),))
   #     | app.signature("sum_numbers")
   # )
+
+  run_workflow(
+    title="Dynamic Workflow with API calls",
+    workflow=
+        app.signature("generate_list", kwargs={"amount": random.randint(1, 10)})
+      | app.signature("process_numbers_individually", args=(app.signature("double_number") | app.signature("square_number"),))
+      | app.signature("sum_numbers")
+  )
