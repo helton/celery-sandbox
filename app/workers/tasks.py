@@ -1,7 +1,7 @@
 import os
 import celery
 import httpx
-from celery import chain, chord, group, subtask
+from celery import chord, group, subtask
 from celery.utils.log import get_task_logger
 from typing import List
 from shared.app import app

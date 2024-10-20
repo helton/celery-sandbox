@@ -30,6 +30,7 @@ app = Celery(
     result_backend=dynamodb_url,
     dynamodb_endpoint_url=dynamodb_endpoint_url,
     result_extended=True,
+    result_chord_join_timeout = 300,  # Set to 5m (300s), default is 3m (180s)
     worker_prefetch_multiplier=1,
     worker_send_task_events=True,
     task_send_sent_event=True,

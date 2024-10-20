@@ -128,7 +128,7 @@ services:
       - local_network
     profiles:
       - celery
-    cpus: 2.0     # Allocate 3 virtual CPUs
+    cpus: 2.0     # Allocate 2 virtual CPUs
     mem_limit: 4g # Allocate 4 Gigabytes of memory
 
   flower:

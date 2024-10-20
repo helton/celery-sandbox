@@ -15,6 +15,7 @@ ulid = "^1.1"
 celery = {version = "5.5.0rc1", extras = ["dynamodb", "redis"]}
 flower = "^2.0.1"
 httpx = "^0.27.2"
+gevent = "^24.10.3"
 
 [tool.poetry.group.api.dependencies]
 fastapi = "^0.115.2"
@@ -78,23 +79,32 @@ api = """
   uvicorn api.main:app --port 8080
 """
 client = """
+  executions=1
+
+  run_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+  run_dir="$(pwd)/.runs"
+  mkdir -p "$run_dir"
+  output_file="$run_dir/${run_uuid}.txt"
+
+  {
+    echo "[Run $run_uuid]"
+    echo "Running $executions workflow(s)...\n"
+  } | tee -a "$output_file"
+
   cd app
   export $(grep -v '^#' $(pwd)/.env | grep -v '^$' | xargs)
-
-  executions=100
-  printf "Running $executions workflows...\n\n"
-
+  
   start_time=$(date +%s.%N)
   TMP_DIR=$(mktemp -d)
 
   run_execution() {
       local exec_num=$1
-      local output_file="$TMP_DIR/output_$exec_num.txt"
+      local exec_output_file="$TMP_DIR/output_$exec_num.txt"
       {
           echo "Execution $exec_num"
           printf '========================================\n'
           python -m client.client
-      } > "$output_file" 2>&1
+      } > "$exec_output_file" 2>&1
   }
 
   for ((i=1; i<=executions; i++)); do
@@ -117,7 +127,8 @@ client = """
           timeout_count=$((timeout_count + 1))
       fi
       cat "$TMP_DIR/output_$i.txt"
-      echo
+      cat "$TMP_DIR/output_$i.txt" >> "$output_file"
+      echo >> "$output_file"
   done
 
   rm -r "$TMP_DIR"
@@ -125,16 +136,21 @@ client = """
   end_time=$(date +%s.%N)
   elapsed=$(awk -v start="$start_time" -v end="$end_time" 'BEGIN { printf "%.2f", end - start }')
 
-  echo "[Stats]"
-  echo "Elapsed time:    ${elapsed} seconds"
-  echo "Total:           ${executions}"
-  echo "  ✅ Success:    ${success_count}"
-  echo "  ❌ Failures:   ${fail_count}"
-  echo "  ⏰ Timeouts:   ${timeout_count}"
+  {
+    echo "[Summary]"
+    echo "Pool:            $WORKER_POOL"
+    echo "Concurrency:     $WORKER_CONCURRENCY"
+    echo "ID:              $run_uuid"
+    echo "Elapsed time:    ${elapsed} seconds"
+    echo "Total:           ${executions}"
+    echo "  ✅ Success:    ${success_count}"
+    echo "  ❌ Failures:   ${fail_count}"
+    echo "  ⏰ Timeouts:   ${timeout_count}"
+  } | tee -a "$output_file"
 """
 go="""
   task docker_down
   task docker_all
   sleep 30
-  task client | tee output.txt
+  task client
 """
